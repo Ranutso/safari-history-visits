@@ -16,14 +16,11 @@ TIME_STRING_TABBED = "%A\t%B\t%d\t%Y\t%H:%M:%S"
 
 ## Helpful functions
 
-def dateString(dateobj, tabbed=False):
+def dateString(dateobj, string):
 	### Converts dateobj into a human readable string.
 
 	# Adding 978307200 to the visit number is required in order to correctly display the date.
-	if tabbed:
-		return datetime.fromtimestamp(dateobj+978307200).strftime(TIME_STRING_TABBED)
-	else:
-		return datetime.fromtimestamp(dateobj+978307200).strftime(TIME_STRING)
+	return datetime.fromtimestamp(dateobj+978307200).strftime(string)
 
 ## Parsing our command options.
 ## Usage: command [optional] url
@@ -58,7 +55,7 @@ if type(args.max) is int:
 else:
 	# Show the default number of entries
 	limit = "LIMIT {}".format(DEFAULT_LIMIT)
-	display_line = DISPLAY_LINE + ":\n(If you want to see more visits use the --max parameter)"
+	display_line = DISPLAY_LINE + ":\n(if you want to see more visits use the --max parameter)"
 
 ## Connecting to the database
 
@@ -85,21 +82,29 @@ c.execute('SELECT visit_time from history_visits where history_item=? ORDER BY v
 (first_visit,) = c.fetchone()
 
 if visit_count == 1:
-	print("You have visited that web page once at {}.".format(dateString(first_visit)))
+	print("You have visited that web page once at {}.".format(dateString(first_visit, TIME_STRING)))
 	exit()
 
 else:
 	print("You have visited that web page {} times.".format(visit_count))
-	print("Your first visit was on {}.".format(dateString(first_visit)))
+	print("Your first visit was on {}.".format(dateString(first_visit, TIME_STRING)))
 	print()
 
 # Now we'll query for the visits.
 
 query_visit = (id,)
-visits_query_result = c.execute('SELECT visit_time, title from history_visits WHERE history_item=? ORDER BY visit_time desc ' + limit, query_visit)
-visits = visits_query_result.fetchall() # Damn you SQLite!!!!!!!!!
+#visits_query_result = c.execute('SELECT visit_time, title from history_visits WHERE history_item=? ORDER BY visit_time desc ' + limit, query_visit)
+visits_query_result = c.execute('SELECT * FROM ( SELECT visit_time, title FROM history_visits WHERE history_item=? ORDER BY visit_time desc {limit} ) sub ORDER BY visit_time asc'.format(limit=limit), query_visit)
+# number_of_visits = visits_query_result.rownumber # Damn you SQLite!!!!!!
+visits = visits_query_result.fetchall()            # Damn you SQLite!!!!!!
 print(display_line.format(visit_number=len(visits)))
 for visit in visits:
-	print("{}\t|\t{}".format(dateString(visit[0], tabbed=True), visit[1]))
+	weekday = dateString(visit[0], "%A")
+	day = dateString(visit[0], "%d")
+	month = dateString(visit[0], "%B")
+	year = dateString(visit[0], "%Y")
+	time = dateString(visit[0], "%H:%M:%S")
+	visit_date_string = "{:<11}{:<3}{:<11}{:<5}{:<9} | {}".format(weekday, day, month, year, time, visit[1])
+	print(visit_date_string)
 
 safari.close()
